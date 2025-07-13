@@ -1,0 +1,81 @@
+# This is a GitHub Actions workflow file.
+# It defines a set of automated tasks that run on GitHub's servers.
+# This specific workflow compiles the lxappearance source code into a
+# Debian package (.deb) every time you push a change.
+
+name: Build Debian Package
+
+# --- Triggers ---
+# This section defines when the workflow should run.
+on:
+  # Run on every push to the 'master' branch.
+  push:
+    branches: [ master ]
+  # Allows you to manually trigger the workflow from the GitHub Actions tab.
+  workflow_dispatch:
+
+# --- Jobs ---
+# A workflow is made up of one or more jobs that can run in parallel or sequentially.
+jobs:
+  # The name of our single job.
+  build:
+    # --- Runner Environment ---
+    # Specifies the type of virtual machine to run the job on.
+    # 'ubuntu-latest' is perfect for building Debian packages.
+    runs-on: ubuntu-latest
+
+    # --- Steps ---
+    # A sequence of tasks to be executed.
+    steps:
+      # Step 1: Check out the repository code
+      # This downloads your repository's code onto the runner.
+      # using actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Install Build Dependencies
+      # This runs shell commands to update the package list and install all
+      # the necessary tools and development libraries for building lxappearance.
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          # Using --no-install-recommends makes the process slightly faster and leaner.
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            debhelper \
+            autotools-dev \
+            intltool \
+            docbook-xml \
+            docbook-xsl \
+            libglib2.0-dev \
+            libgtk-3-dev \
+            libx11-dev \
+            xsltproc \
+            libdbus-glib-1-dev
+
+      # Step 3: Run autoreconf -i
+      # It's good practice to generate fresh autotools build system files.
+      - name: Generate build system files
+        run: autoreconf -i
+
+      # Step 4: Build the .deb Package
+      # This executes the Debian package build command from the root of the source.
+      # The '-us -uc' flags prevent the tool from trying to sign the packages.
+      - name: Build the .deb package
+        run: dpkg-buildpackage -us -uc
+
+      # Step 5: Upload the Artifact
+      # This step finds the compiled .deb file (which is created one directory up)
+      # and uploads it as a "build artifact". This makes the file downloadable
+      # from the summary page of the workflow run.
+      # using actions/upload-artifact@v4
+      - name: Upload .deb package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          # The name that will appear for the downloadable artifact.
+          name: lxappearance-deb-package-${{ github.sha }}
+          # The path to the file(s) to upload. The wildcard '*' handles
+          # variations in version or architecture in the filename.
+          path: ../*.deb
+          # Set artifact retention period to 14 days (default is 90)
+          retention-days: 14
